@@ -25,7 +25,6 @@ public class ParkingSpace {
             fetch = FetchType.EAGER,
             cascade = {CascadeType.PERSIST})
     private List<ParkingLot> parkingLots;
-
     private String blobContainerName;
     @ManyToOne(targetEntity = User.class, fetch = FetchType.EAGER)
     @JoinColumn(name = "USER_PARKING_SPACE_ID", referencedColumnName = "id")

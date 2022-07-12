@@ -1,10 +1,8 @@
 package de.volkswagen.fakultaet.backend.service;
 
 import com.microsoft.azure.storage.StorageException;
-import com.sun.jndi.toolkit.url.Uri;
-import de.volkswagen.fakultaet.backend.domain.dto.ParkingSpaceCreateRequest;
+import de.volkswagen.fakultaet.backend.domain.dto.ParkingSpaceRequest;
 import de.volkswagen.fakultaet.backend.domain.dto.ParkingSpaceResponse;
-import de.volkswagen.fakultaet.backend.domain.dto.ParkingSpaceUpdateRequest;
 import de.volkswagen.fakultaet.backend.domain.model.*;
 import de.volkswagen.fakultaet.backend.repository.ParkingLotRepository;
 import de.volkswagen.fakultaet.backend.repository.ParkingSpaceRepository;
@@ -40,7 +38,7 @@ public class ParkingService {
         this.azureBlobService = azureBlobService;
     }
 
-    public ParkingSpaceResponse createParkingSpace(ParkingSpaceCreateRequest request, User user) {
+    public ParkingSpaceResponse createParkingSpace(ParkingSpaceRequest request, User user) {
         ParkingSpace parkingSpaceDao = new ParkingSpace();
         BeanUtils.copyProperties(request, parkingSpaceDao, ApplicationUtilities.getNullPropertyNames(request));
         List<ParkingLot> parkingLots = new ArrayList<>();
@@ -52,19 +50,22 @@ public class ParkingService {
         return mapParkingSpaceToParkingSpaceResponse(this.parkingSpaceRepository.save(parkingSpaceDao));
     }
 
-    public ParkingSpace getParkingSpaceById(Long id) {
-        return this.parkingSpaceRepository.findById(id)
-                .orElseThrow(EntityNotFoundException::new);
+    public ParkingSpaceResponse getParkingSpaceResponseById(Long id) {
+        return mapParkingSpaceToParkingSpaceResponse(this.parkingSpaceRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("ID does not exists")));
     }
 
+    public ParkingSpace getParkingSpaceById(Long id) {
+        return this.parkingSpaceRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("ID does not exists"));
+    }
     public List<ParkingSpaceResponse> getParkingSpacesByUser(User user) {
         return this.parkingSpaceRepository.findByUser(user).stream()
                 .map(parkingSpace -> mapParkingSpaceToParkingSpaceResponse(parkingSpace))
                 .collect(Collectors.toList());
     }
 
-
-    public List<ParkingSpaceResponse> getAvailableParkingSpacesBySearchParam(String location, LocalDateTime arrival, LocalDateTime departure) {
+    public List<ParkingSpaceResponse> getAvailableParkingSpacesBySearchingByCriteria(String location, LocalDateTime arrival, LocalDateTime departure) {
         if (arrival.isAfter(departure)) {
             throw new IllegalArgumentException("Starting date time should be before ending date time!");
         }
@@ -81,12 +82,10 @@ public class ParkingService {
                 .collect(Collectors.toList());
     }
 
-
-
     public ParkingSpaceResponse addPictureToParkingSpace(User currentUser, Long parkingSpaceId, MultipartFile multipartFile) {
         ParkingSpace parkingSpaceToUpdate = this.parkingSpaceRepository.findById(parkingSpaceId)
                 .orElseThrow(EntityNotFoundException::new);
-        if (!currentUser.getMyParkingSpaces().contains(parkingSpaceToUpdate)) {
+        if (!currentUser.getParkingSpaces().contains(parkingSpaceToUpdate)) {
             throw new NoPermissionException();
         }
         if (parkingSpaceToUpdate.getPictureUris().size() < 5) {
@@ -117,10 +116,10 @@ public class ParkingService {
         return mapParkingSpaceToParkingSpaceResponse(this.parkingSpaceRepository.save(parkingSpaceToUpdate));
     }
 
-    public ParkingSpaceResponse updateParkingSpace(User user, Long id, ParkingSpaceUpdateRequest request) {
+    public ParkingSpaceResponse updateParkingSpace(User user, Long id, ParkingSpaceRequest request) {
         ParkingSpace parkingSpaceDao = this.parkingSpaceRepository.findById(id)
                 .orElseThrow(EntityNotFoundException::new);
-        if (!user.getMyParkingSpaces().contains(parkingSpaceDao)) {
+        if (!user.getParkingSpaces().contains(parkingSpaceDao)) {
             throw new NoPermissionException();
         }
         BeanUtils.copyProperties(request, parkingSpaceDao, ApplicationUtilities.getNullPropertyNames(request));
@@ -140,7 +139,7 @@ public class ParkingService {
     public ParkingLot reserveParkingLot(ParkingSpace parkingSpace, LocalDateTime arrivalDateTime, LocalDateTime departureDateTime) {
         ParkingLot parkingLot = getAvailableParkingLots(parkingSpace, arrivalDateTime, departureDateTime).stream()
                 .findFirst()
-                .orElseThrow(EntityNotFoundException::new);
+                .orElseThrow(() -> new EntityNotFoundException("No available parking lot was found"));
         Timeslot timeslotToReserve = new Timeslot(arrivalDateTime, departureDateTime);
         parkingLot.getReservedTimeslots().add(timeslotToReserve);
         return this.parkingLotRepository.save(parkingLot);
@@ -155,27 +154,37 @@ public class ParkingService {
     }
 
     // UTILITIES
-    // Checks to see if Timeslot contains a specific date time.
-    private boolean contains(Timeslot bookedTimeslot, LocalDateTime dateTime) {
-        return dateTime.isAfter(bookedTimeslot.getStartingDateTime()) && dateTime.isBefore(bookedTimeslot.getEndingDateTime());
+
+    private boolean endsAtTheSameTimeAs(Timeslot bookedTimeslot, LocalDateTime dateTimeToCheck) {
+        return bookedTimeslot.getEndingDateTime().isEqual(dateTimeToCheck);
     }
 
-    // Returns true if Timeslot overlaps another Timeslot.
-    private boolean overlaps(Timeslot bookedTimeslot, LocalDateTime arrival, LocalDateTime departure) {
-        return contains(bookedTimeslot, arrival) || contains(bookedTimeslot, departure);
+    private boolean startsAtTheSameTimeAs(Timeslot bookedTimeslot, LocalDateTime dateTimeToCheck) {
+        return bookedTimeslot.getStartingDateTime().isEqual(dateTimeToCheck);
     }
 
-    // Returns true if at least one Timeslot is available.
-    private boolean isAvailable(LocalDateTime arrival, LocalDateTime departure, List<Timeslot> bookedTimeslots) {
-        if (bookedTimeslots.isEmpty()) {
+    private boolean equals(Timeslot bookedTimeslot, LocalDateTime startDateTime, LocalDateTime endDateTime) {
+        return startsAtTheSameTimeAs(bookedTimeslot, startDateTime) && endsAtTheSameTimeAs(bookedTimeslot, endDateTime);
+    }
+
+    private boolean contains(Timeslot bookedTimeslot, LocalDateTime dateTimeToCheck) {
+        return dateTimeToCheck.isAfter(bookedTimeslot.getStartingDateTime()) || dateTimeToCheck.isBefore(bookedTimeslot.getEndingDateTime());
+    }
+
+    private boolean overlaps(Timeslot bookedTimeslot, LocalDateTime startDateTime, LocalDateTime endDateTime) {
+        return contains(bookedTimeslot, startDateTime) || contains(bookedTimeslot, endDateTime);
+    }
+
+    private boolean isAvailable(List<Timeslot> bookedTimeslots, LocalDateTime startDateTime, LocalDateTime endDateTime) {
+        if (bookedTimeslots == null || bookedTimeslots.size() == 0) {
             return true;
         }
-        for (Timeslot timeslot : bookedTimeslots) {
-            if (!overlaps(timeslot, arrival, departure)) {
-                return true;
+        for (Timeslot timeslotToCheck : bookedTimeslots) {
+            if (overlaps(timeslotToCheck, startDateTime, endDateTime) || equals(timeslotToCheck, startDateTime, endDateTime)) {
+                return false;
             }
         }
-        return false;
+        return true;
     }
 
     private ParkingSpaceResponse mapParkingSpaceToParkingSpaceResponse(ParkingSpace parkingSpace) {
@@ -185,12 +194,11 @@ public class ParkingService {
         return response;
     }
 
-    private List<ParkingLot> getAvailableParkingLots(ParkingSpace parkingSpace, LocalDateTime arrival, LocalDateTime departure) {
+    private List<ParkingLot> getAvailableParkingLots(ParkingSpace parkingSpace, LocalDateTime arrivalDateTime, LocalDateTime departureDateTime) {
         return parkingSpace.getParkingLots().stream()
-                .filter(parkingLot -> isAvailable(arrival, departure, parkingLot.getReservedTimeslots()))
+                .filter(parkingLot -> isAvailable(parkingLot.getReservedTimeslots(), arrivalDateTime, departureDateTime))
                 .collect(Collectors.toList());
     }
-
 
     // EXCEPTIONS
     public static class NoPermissionException extends RuntimeException {

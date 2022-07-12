@@ -2,8 +2,7 @@ package de.volkswagen.fakultaet.backend.controller;
 
 import com.sun.istack.NotNull;
 import de.volkswagen.fakultaet.backend.domain.dto.ParkingSpaceResponse;
-import de.volkswagen.fakultaet.backend.domain.dto.ParkingSpaceUpdateRequest;
-import de.volkswagen.fakultaet.backend.domain.dto.ParkingSpaceCreateRequest;
+import de.volkswagen.fakultaet.backend.domain.dto.ParkingSpaceRequest;
 import de.volkswagen.fakultaet.backend.domain.model.User;
 import de.volkswagen.fakultaet.backend.service.AuthService;
 import de.volkswagen.fakultaet.backend.service.AuthService.TokenExpiredException;
@@ -33,28 +32,39 @@ public class ParkingController {
         this.authService = authService;
     }
 
-    @GetMapping("/spaces/{location}")
-    public ResponseEntity<List<ParkingSpaceResponse>> searchParkingSpaces(@PathVariable String location,
-                                                                          @RequestParam(value = "arrivalDateTime") LocalDateTime arrivalDateTime,
-                                                                          @RequestParam(value = "departureDateTime") LocalDateTime departureDateTime) {
-        List<ParkingSpaceResponse> parkingSpaceResponses = parkingService.getAvailableParkingSpacesBySearchParam(location, arrivalDateTime, departureDateTime);
+
+    //CRUD
+    @PostMapping("/spaces")
+    public ResponseEntity<ParkingSpaceResponse> createParkingSpace(@RequestHeader(value = "Authorization") String token,
+                                                                   @RequestBody ParkingSpaceRequest parkingSpaceCreateRequest) {
+        try {
+            User currentUser = this.authService.getCurrentUser(token);
+            return ResponseEntity.ok(this.parkingService.createParkingSpace(parkingSpaceCreateRequest, currentUser));
+        } catch (UnauthorizedException | TokenExpiredException | EntityNotFoundException exception) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @GetMapping("/spaces/searching")
+    public ResponseEntity<List<ParkingSpaceResponse>> getParkingSpaces(@RequestParam(name = "location") String location,
+                                                                       @RequestParam(name = "arrival_date_time") LocalDateTime arrivalDateTime,
+                                                                       @RequestParam(name = "departure_date_time") LocalDateTime departureDateTime) {
+        List<ParkingSpaceResponse> parkingSpaceResponses = parkingService.getAvailableParkingSpacesBySearchingByCriteria(location, arrivalDateTime, departureDateTime);
         return parkingSpaceResponses.isEmpty()
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.ok(parkingSpaceResponses);
     }
 
-    @PostMapping("/spaces")
-    public ResponseEntity<ParkingSpaceResponse> createParkingSpace(@RequestHeader(value = "Authorization") String token,
-                                                                   @RequestBody ParkingSpaceCreateRequest parkingSpaceCreateRequest) {
+    @GetMapping("/spaces/searching/id")
+    public ResponseEntity<ParkingSpaceResponse> getParkingSpaceById(@RequestParam(name = "parking_space_id") Long parkingSpaceId) {
         try {
-            User currentUser = this.authService.getCurrentUser(token);
-            return ResponseEntity.ok(this.parkingService.createParkingSpace(parkingSpaceCreateRequest, currentUser));
-        } catch (UnauthorizedException| TokenExpiredException | EntityNotFoundException exception) {
+            return ResponseEntity.ok(this.parkingService.getParkingSpaceResponseById(parkingSpaceId));
+        } catch (EntityNotFoundException exception) {
             return ResponseEntity.badRequest().build();
         }
     }
 
-    @GetMapping("/spaces")
+    @GetMapping("/spaces/searching/user")
     public ResponseEntity<List<ParkingSpaceResponse>> getParkingSpacesByUser(@RequestHeader(value = "Authorization") String token) {
         try {
             User currentUser = this.authService.getCurrentUser(token);
@@ -66,10 +76,10 @@ public class ParkingController {
         }
     }
 
-    @PatchMapping("/spaces/{id}")
+    @PatchMapping("/spaces/searching/id")
     public ResponseEntity<ParkingSpaceResponse> updateParkingSpace(@RequestHeader(value = "Authorization") String token,
-                                                                   @PathVariable(name = "id") Long parkingSpaceId,
-                                                                   @RequestBody ParkingSpaceUpdateRequest request) {
+                                                                   @RequestParam(name = "parking_space_id") Long parkingSpaceId,
+                                                                   @RequestBody ParkingSpaceRequest request) {
         try {
             User currentUser = this.authService.getCurrentUser(token);
             return ResponseEntity.ok(this.parkingService.updateParkingSpace(currentUser, parkingSpaceId, request));
@@ -78,11 +88,13 @@ public class ParkingController {
         } catch (TokenExpiredException | NoPermissionException exception) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
+
+
     }
 
-    @PatchMapping("/spaces/{id}/picture")
+    @PatchMapping("/spaces/searching/id/picture")
     public ResponseEntity<ParkingSpaceResponse> addPictureToParkingSpace(@RequestHeader(value = "Authorization") String token,
-                                                                         @PathVariable(name = "id") Long parkingSpaceId,
+                                                                         @PathVariable(name = "parking_space_id") Long parkingSpaceId,
                                                                          @RequestParam(name = "file") @NotNull MultipartFile multipartFile) {
         try {
             User currentUser = this.authService.getCurrentUser(token);

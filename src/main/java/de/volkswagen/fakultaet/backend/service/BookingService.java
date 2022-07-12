@@ -32,7 +32,8 @@ public class BookingService {
         bookingToAdd.setTenantId(tenantId);
         bookingToAdd.setParkingSpaceId(parkingSpaceId);
         // get first available parking lot and set it to booking entity
-        bookingToAdd.setParkingLotId(this.parkingService.reserveParkingLot(parkingSpaceToBook, arrivalDateTime, departureDateTime).getId());
+        ParkingLot parkingLot = this.parkingService.reserveParkingLot(parkingSpaceToBook, arrivalDateTime, departureDateTime);
+        bookingToAdd.setParkingLotId(parkingLot.getId());
         bookingToAdd.setArrivalDateTime(arrivalDateTime);
         bookingToAdd.setDepartureDateTime(departureDateTime);
         // calculate total price for booking request

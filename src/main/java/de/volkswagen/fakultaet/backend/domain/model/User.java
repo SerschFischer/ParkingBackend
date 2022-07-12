@@ -31,5 +31,5 @@ public class User {
             mappedBy = "user",
             fetch = FetchType.EAGER,
             cascade = {CascadeType.PERSIST})
-    private List<ParkingSpace> myParkingSpaces;
+    private List<ParkingSpace> parkingSpaces;
 }

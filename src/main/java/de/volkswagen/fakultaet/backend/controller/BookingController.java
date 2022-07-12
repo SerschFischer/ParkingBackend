@@ -1,7 +1,9 @@
 package de.volkswagen.fakultaet.backend.controller;
 
+import de.volkswagen.fakultaet.backend.domain.model.AuthUser;
 import de.volkswagen.fakultaet.backend.domain.model.Booking;
 import de.volkswagen.fakultaet.backend.domain.model.BookingStatus;
+import de.volkswagen.fakultaet.backend.domain.model.User;
 import de.volkswagen.fakultaet.backend.service.AuthService;
 import de.volkswagen.fakultaet.backend.service.AuthService.UnauthorizedException;
 import de.volkswagen.fakultaet.backend.service.AuthService.TokenExpiredException;
@@ -30,13 +32,13 @@ public class BookingController {
 
     @PostMapping("/request")
     public ResponseEntity<Booking> createBookingRequest(@RequestHeader(value = "Authorization") String token,
-                                                        @RequestParam(value = "parkingSpaceId", required = true) Long parkingSpaceId,
-                                                        @RequestParam(value = "arrivalDateTime", required = true) LocalDateTime arrivalDateTime,
-                                                        @RequestParam(value = "departureDateTime", required = true) LocalDateTime departureDateTime) {
+                                                        @RequestParam(name = "parking_space_id", required = true) Long parkingSpaceId,
+                                                        @RequestParam(name = "arrival_date_time", required = true) LocalDateTime arrivalDateTime,
+                                                        @RequestParam(name = "departure_date_time", required = true) LocalDateTime departureDateTime) {
         try {
-            Long tenantId = this.authService.getCurrentUser(token).getId();
+            User tenant = this.authService.getCurrentUser(token);
             return ResponseEntity.accepted().body(this.bookingService.
-                    createBookingRequest(tenantId, parkingSpaceId, arrivalDateTime, departureDateTime));
+                    createBookingRequest(tenant.getId(), parkingSpaceId, arrivalDateTime, departureDateTime));
         } catch (UnauthorizedException | TokenExpiredException exception) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -56,8 +58,8 @@ public class BookingController {
 
     @PostMapping("/response")
     public ResponseEntity<Booking> createBookingResponse(@RequestHeader(value = "Authorization") String token,
-                                                         @RequestParam(value = "bookingId", required = true) Long bookingId,
-                                                         @RequestParam(value = "bookingStatus", required = true) BookingStatus bookingStatus) {
+                                                         @RequestParam(name = "booking_id", required = true) Long bookingId,
+                                                         @RequestParam(name = "booking_status", required = true) BookingStatus bookingStatus) {
         try {
             Long ownerId = this.authService.getCurrentUser(token).getId();
             return ResponseEntity.accepted().body(this.bookingService.createBookingResponse(ownerId, bookingId, bookingStatus));
