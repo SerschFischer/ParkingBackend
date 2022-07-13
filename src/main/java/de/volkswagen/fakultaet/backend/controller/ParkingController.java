@@ -94,7 +94,7 @@ public class ParkingController {
 
     @PatchMapping("/spaces/searching/id/picture")
     public ResponseEntity<ParkingSpaceResponse> addPictureToParkingSpace(@RequestHeader(value = "Authorization") String token,
-                                                                         @PathVariable(name = "parking_space_id") Long parkingSpaceId,
+                                                                         @RequestParam(name = "parking_space_id") Long parkingSpaceId,
                                                                          @RequestParam(name = "file") @NotNull MultipartFile multipartFile) {
         try {
             User currentUser = this.authService.getCurrentUser(token);

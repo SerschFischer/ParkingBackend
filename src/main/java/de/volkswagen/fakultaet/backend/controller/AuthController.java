@@ -4,6 +4,7 @@ import de.volkswagen.fakultaet.backend.domain.dto.UserLoginRequest;
 import de.volkswagen.fakultaet.backend.domain.dto.UserRegisterRequest;
 import de.volkswagen.fakultaet.backend.service.AuthService;
 import de.volkswagen.fakultaet.backend.service.AuthService.InvalidPasswordException;
+import de.volkswagen.fakultaet.backend.service.AuthService.UnauthorizedException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,7 +43,7 @@ public class AuthController {
         try {
             this.authService.logoutUser(token);
             return ResponseEntity.accepted().build();
-        } catch (EntityNotFoundException exception) {
+        } catch (UnauthorizedException exception) {
             return ResponseEntity.badRequest().build();
         }
     }

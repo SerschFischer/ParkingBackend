@@ -19,14 +19,11 @@ import java.util.UUID;
 
 @Service
 public class AzureBlobService {
-
     private static final Logger LOGGER = LoggerFactory.getLogger(AzureBlobService.class);
 
-    private CloudBlobContainer cloudBlobContainer;
     private CloudBlobClient cloudBlobClient;
 
-    public AzureBlobService(CloudBlobContainer cloudBlobContainer, CloudBlobClient cloudBlobClient) {
-        this.cloudBlobContainer = cloudBlobContainer;
+    public AzureBlobService(CloudBlobClient cloudBlobClient) {
         this.cloudBlobClient = cloudBlobClient;
     }
 
@@ -37,11 +34,14 @@ public class AzureBlobService {
                         new BlobRequestOptions(),
                         new OperationContext());
     }
-    public URI uploadFile(MultipartFile file) throws URISyntaxException, StorageException, IOException {
+
+    public URI uploadFile(String containerName, MultipartFile file) throws URISyntaxException, StorageException, IOException {
         String blobFileName = String.join(".",
                 UUID.randomUUID().toString(),
                 FilenameUtils.getExtension(file.getOriginalFilename()));
-        CloudBlockBlob cloudBlockBlob = this.cloudBlobContainer.getBlockBlobReference(blobFileName);
+        CloudBlockBlob cloudBlockBlob = this.cloudBlobClient
+                .getContainerReference(containerName)
+                .getBlockBlobReference(blobFileName);
         cloudBlockBlob.upload(file.getInputStream(), file.getSize());
         return cloudBlockBlob.getUri();
     }
@@ -60,6 +60,4 @@ public class AzureBlobService {
                 .getBlockBlobReference(blobFileName)
                 .deleteIfExists();
     }
-
-
 }

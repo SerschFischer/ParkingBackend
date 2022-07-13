@@ -1,9 +1,7 @@
 package de.volkswagen.fakultaet.backend.configuration;
 
 import com.microsoft.azure.storage.CloudStorageAccount;
-import com.microsoft.azure.storage.StorageException;
 import com.microsoft.azure.storage.blob.CloudBlobClient;
-import com.microsoft.azure.storage.blob.CloudBlobContainer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
@@ -31,11 +29,5 @@ public class ApplicationConfiguration {
         return CloudStorageAccount
                 .parse(this.environment.getProperty("spring.cloud.azure.storage.blob.connection-string"))
                 .createCloudBlobClient();
-    }
-
-    @Bean
-    public CloudBlobContainer cloudBlobContainer() throws URISyntaxException, InvalidKeyException, StorageException {
-        return cloudBlobClient()
-                .getContainerReference(this.environment.getProperty("spring.cloud.azure.storage.blob.container-name"));
     }
 }

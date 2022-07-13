@@ -91,13 +91,13 @@ public class ParkingService {
         if (parkingSpaceToUpdate.getPictureUris().size() < 5) {
             String blobContainerName = parkingSpaceToUpdate.getBlobContainerName();
             // create blob container name and blob container if not exists
-            if (StringUtils.isEmpty(blobContainerName) || blobContainerName.length() != 15) {
+            if (StringUtils.isEmpty(blobContainerName)) {
                 boolean isBlobContainerCreated = false;
                 try {
-                    blobContainerName = "pictures" + RandomStringUtils.randomAlphabetic(7).toLowerCase();
+                    blobContainerName = "pictures-" + RandomStringUtils.randomAlphabetic(11).toLowerCase();
                     isBlobContainerCreated = this.azureBlobService.createContainer(blobContainerName);
                 } catch (URISyntaxException | StorageException exception) {
-                    throw new RuntimeException(exception);
+                    throw new RuntimeException("Blob container could not creates.");
                 }
                 if (isBlobContainerCreated) {
                     parkingSpaceToUpdate.setBlobContainerName(blobContainerName);
@@ -105,13 +105,13 @@ public class ParkingService {
             }
             // upload file to azure blob storage
             try {
-                URI blobFileUri = this.azureBlobService.uploadFile(multipartFile);
+                URI blobFileUri = this.azureBlobService.uploadFile(blobContainerName, multipartFile);
                 parkingSpaceToUpdate.getPictureUris().add(blobFileUri.toString());
             } catch (URISyntaxException | StorageException | IOException exception) {
                 throw new RuntimeException(exception);
             }
         } else {
-            throw new MaxCapacityReachedException();
+            throw new MaxCapacityReachedException("Max Capacity is reached.");
         }
         return mapParkingSpaceToParkingSpaceResponse(this.parkingSpaceRepository.save(parkingSpaceToUpdate));
     }
@@ -129,7 +129,6 @@ public class ParkingService {
             }
         } else {
             if (request.getAmountOfParkingLots() > parkingSpaceDao.getParkingLots().size()) {
-                // TODO cancel all bookings for this parking spaces
                 parkingSpaceDao.getParkingLots().subList(parkingSpaceDao.getParkingLots().size(), request.getAmountOfParkingLots()).clear();
             }
         }
@@ -154,7 +153,6 @@ public class ParkingService {
     }
 
     // UTILITIES
-
     private boolean endsAtTheSameTimeAs(Timeslot bookedTimeslot, LocalDateTime dateTimeToCheck) {
         return bookedTimeslot.getEndingDateTime().isEqual(dateTimeToCheck);
     }
